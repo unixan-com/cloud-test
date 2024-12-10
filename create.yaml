@@ -5,6 +5,7 @@
   vars:
     ec2_defaults:
       ssh_key: public-ssh-key
+      region: us-west-2
       subnet: subnet-074ab24da8eeae0d5
       instance_type: t2.micro
       ami: ami-05d38da78ce859165
@@ -24,6 +25,7 @@
           amazon.aws.ec2_instance:
             name: "{{ inventory_hostname }}"
             key_name: "{{ ec2_or_default.ssh_key }}"
+            regsion: "{{ ec2_or_default.region }}"
             vpc_subnet_id: "{{ ec2_or_default.subnet }}"
             instance_type: "{{ ec2_or_default.instance_type }}"
             security_group: default
