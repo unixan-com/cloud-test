@@ -1,0 +1,104 @@
+#!/usr/bin/env ansible-playbook --inventory=inventory.yaml
+- name: Create EC2 instances
+  hosts: ec2_instances
+  gather_facts: false # instances may not exist yet
+  vars:
+    ec2_defaults:
+      ssh_key: public-ssh-key
+      subnet: subnet-074ab24da8eeae0d5
+      instance_type: t2.micro
+      ami: ami-05d38da78ce859165
+    # Each instance may have an "ec2" dictionary that overrides the defaults, like so:
+    # ec2:
+    #   instance_type: m5.large
+    # This here below combines "ec2" from instance's vars (if exists) with the defaults given above
+    ec2_or_default: "{{ ec2_defaults | combine(ec2 | default({})) }}"
+  tasks:
+
+    - name: EC2 instances
+      vars:
+      amazon.aws.ec2_instance:
+        name: "{{ inventory_hostname }}"
+        key_name: "{{ ec2_or_default.ssh_key }}"
+        vpc_subnet_id: "{{ ec2_or_default.subnet }}"
+        instance_type: "{{ ec2_or_default.instance_type }}"
+        security_group: default
+        network_interfaces:
+          - assign_public_ip: true
+        image_id: "{{ ec2_or_default.ami }}"
+
+- name: Set up web servers
+  hosts: web_servers
+  tasks:
+
+    - name: NGINX installed
+      ansible.builtin.package:
+        name: nginx
+
+- name: Configure Sales web server
+  hosts: sales_web
+  tasks:
+
+    - name: Index to areas of the site
+      ansible.builtin.copy:
+        dest: /var/www/html/index.html
+        mode: '0644'
+        content: |
+          <!DOCTYPE html><html>
+          <head>
+            <title>Sales Directory</title>
+          </head>
+          <body>
+          <h1>Sales Directory</h1>
+          <p>Welcome.  Please choose the area you need to access:</p>
+          <ul>
+            <li><a href="leads/">Leads</a></li>
+            <li><a href="orders/">Orders</a></li>
+            <li><a href="calendar/">Calendar</a></li>
+          </ul>
+          </body>
+          </html>
+
+    - name: Create subdirectories for each website area
+      loop:
+        - leads
+        - orders
+        - calendar
+      ansible.builtin.file:
+        dest: /var/www/html/{{ item }}
+        state: directory
+        mode: '0755'
+
+- name: Configure Shipping web server
+  hosts: shipping_web
+  tasks:
+
+    - name: Index to areas of the site
+      ansible.builtin.copy:
+        dest: /var/www/html/index.html
+        mode: '0644'
+        content: |
+          <!DOCTYPE html><html>
+          <head>
+            <title>Shipping Directory</title>
+          </head>
+          <body>
+          <h1>Shipping Directory</h1>
+          <p>Welcome.  Please choose the area you need to access:</p>
+          <ul>
+            <li><a href="supplies/">Supplies</a></li>
+            <li><a href="tracking/">Tracking</a></li>
+            <li><a href="receipts/">Receipts</a></li>
+          </ul>
+          </body>
+          </html>
+
+    - name: Create subdirectories for each website area
+      loop:
+        - supplies
+        - tracking
+        - receipts
+      ansible.builtin.file:
+        dest: /var/www/html/{{ item }}
+        state: directory
+        mode: '0755'

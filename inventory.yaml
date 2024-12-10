@@ -1,0 +1,16 @@
+all:
+  children:
+    ec2_instances:
+      hosts:
+        sales-web-1:
+        shipping-web-1:
+    web_servers:
+      hosts:
+        sales-web-1:
+        shipping-web-1:
+    sales_web:
+      hosts:
+        sales-web-1:
+    shipping_web:
+      hosts:
+        shipping-web-1:
