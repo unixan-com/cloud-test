@@ -25,7 +25,7 @@
           amazon.aws.ec2_instance:
             name: "{{ inventory_hostname }}"
             key_name: "{{ ec2_or_default.ssh_key }}"
-            regsion: "{{ ec2_or_default.region }}"
+            region: "{{ ec2_or_default.region }}"
             vpc_subnet_id: "{{ ec2_or_default.subnet }}"
             instance_type: "{{ ec2_or_default.instance_type }}"
             security_group: default
