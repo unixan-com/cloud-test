@@ -15,17 +15,21 @@
     ec2_or_default: "{{ ec2_defaults | combine(ec2 | default({})) }}"
   tasks:
 
-    - name: EC2 instances
-      vars:
-      amazon.aws.ec2_instance:
-        name: "{{ inventory_hostname }}"
-        key_name: "{{ ec2_or_default.ssh_key }}"
-        vpc_subnet_id: "{{ ec2_or_default.subnet }}"
-        instance_type: "{{ ec2_or_default.instance_type }}"
-        security_group: default
-        network_interfaces:
-          - assign_public_ip: true
-        image_id: "{{ ec2_or_default.ami }}"
+    - name: Interact with cloud from localhost
+      delegate_to: localhost
+      connection: local
+      block:
+
+        - name: EC2 instances
+          amazon.aws.ec2_instance:
+            name: "{{ inventory_hostname }}"
+            key_name: "{{ ec2_or_default.ssh_key }}"
+            vpc_subnet_id: "{{ ec2_or_default.subnet }}"
+            instance_type: "{{ ec2_or_default.instance_type }}"
+            security_group: default
+            network_interfaces:
+              - assign_public_ip: true
+            image_id: "{{ ec2_or_default.ami }}"
 
 - name: Set up web servers
   hosts: web_servers
