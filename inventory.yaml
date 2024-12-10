@@ -1,6 +1,9 @@
 all:
   children:
     ec2_instances:
+      vars:
+        ec2:
+          ssh_key: laptop-putty
       hosts:
         sales-web-1:
         shipping-web-1:
