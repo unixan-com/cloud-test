@@ -1,0 +1,44 @@
+#!/usr/bin/env ansible-playbook --inventory=dynamic-inventory.yaml
+- name: Dynamically discern and tag EC2 instances
+  gather_facts: false # instances may not exist yet
+  tasks:
+
+    - name: Fetch /var/www/html/index.html to inspect
+      ansible.builtin.slurp:
+        src: /var/www/html/index.html
+      register: slurp_index_html
+      failed_when: false # in case it's not a web server
+
+    - name: Check various phrases in index.html
+      when: slurp_index_html is successful
+      vars:
+        index_html: "{{ slurp_index_html.content | b64decode }}"
+      block:
+
+        - name: Well known H1 tags on some web servers
+          set_fact:
+            sales_web: "{{ sales_web | default(false) or '<h1>Sales Directory</h1>' in index_html }}"
+            shipping_web: "{{ shipping_web | default(false) or '<h1>Shipping Directory</h1>' in index_html }}"
+
+    # more tests could go here, repeating the same pattern of slurp (or other data fetching) and set_fact
+
+    - name: Discern which group
+      loop:
+        - sales_web
+        - shipping_web
+      when: "{{ item }}"  # meta-lookup group's fact
+      set_fact:
+        group: "{{ item }}"
+
+    - name: Interact with cloud from localhost
+      delegate_to: localhost
+      connection: local
+      block:
+
+        - name: Remove the Env tag
+          amazon.aws.ec2_tag:
+            region: "{{ ec2_or_default.region }}"
+            resource: "{{ ec2.id }}"
+            tags:
+              group: "{{ group }}"
+          register: ec2_tag

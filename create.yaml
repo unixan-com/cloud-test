@@ -1,4 +1,4 @@
-#!/usr/bin/env ansible-playbook --inventory=inventory.yaml
+#!/usr/bin/env ansible-playbook --inventory=static-inventory.yaml
 - name: Create EC2 instances
   hosts: ec2_instances
   gather_facts: false # instances may not exist yet
@@ -32,6 +32,14 @@
             network_interfaces:
               - assign_public_ip: true
             image_id: "{{ ec2_or_default.ami }}"
+          register: ec2_instance
+
+    - name: Take certain details from EC2 information
+      set_fact:
+        ansible_host: ec2_instance.instances[0].public_ip_address
+
+    - name: Ensure host is contactable before continuing
+      ansible.builtin.wait_for_connection: {}
 
 - name: Set up web servers
   hosts: web_servers
