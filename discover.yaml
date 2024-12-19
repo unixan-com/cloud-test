@@ -2,6 +2,8 @@
 - name: Dynamically discern and tag EC2 instances
   hosts: all
   gather_facts: false # instances may not exist yet
+  vars:
+    debug: false
   tasks:
 
     - name: Fetch /var/www/html/index.html to inspect
@@ -43,7 +45,8 @@
               - "{{ instance_id }}"
           register: instance_info
 
-        - name: debug
+        - name: debug EC2 instance info
+          when: debug
           debug:
             var: instance_info
 
