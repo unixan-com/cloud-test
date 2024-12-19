@@ -92,12 +92,15 @@
       ansible.builtin.set_fact:
         inventory: "{{ inventory | default({}) | combine(hostvars[item].inventory_contribution, recursive=true) }}"
 
+    # Here we simply pretty-print this "inventory" data structure for a human to read.
+    # To go beyond printing a data structure, it would be possible to write an action plugin
+    # where Python code can be used directly (ansible.builtin.debug is an easy starting point).
     - name: Inventory
       ansible.builtin.debug:
         var: inventory
-        # If using 'debug' stdout callback plugin, then one could instead use...
+        # If using 'debug' stdout callback plugin (which preserves newlines when printing messages
+        # from module results), then one could instead use...
         #
-        #   msg: "{{ inventory | to_yaml(width=1337) }}"
+        #   msg: "{{ inventory | to_nice_yaml }}"
         #
-        # ... to get a much human-friendlier output.  With default plugin, though,
-        # debug var= is at least readable.
+        # ... to get a much nicer output of this data structure.
