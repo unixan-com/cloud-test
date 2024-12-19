@@ -27,7 +27,7 @@
             - team: shipping
               html_content: <h1>Shipping Directory</h1>
           when: team is not defined and item.html_content in index_html
-          set_fact:
+          ansible.builtin.set_fact:
             team: "{{ item.team }}"
             tier: "{{ tier }}"
 
@@ -47,7 +47,7 @@
 
         - name: debug EC2 instance info
           when: debug
-          debug:
+          ansible.builtin.debug:
             var: instance_info
 
         - name: Set the team tag on the instance
@@ -63,7 +63,10 @@
           register: ec2_tag
 
     - name: Add to inventory for later reporting
-      set_fact:
+      ansible.builtin.set_fact:
+        # Here a jsonquery filter would probably pull out more customized data, but for now this is just
+        # a list of the IP addresses on the instance to get a start on identifying network connectivity
+        # between instances.
         inventory_contribution: >-
           {{ {
             (team | default('unknown_team')): {
@@ -71,7 +74,7 @@
                 (placement.region | default('unknown_region')): {
                   (placement.availability_zone | default('unknown_availability_zone')): {
                     inventory_hostname:
-                      instance_info.instances[0].network_interfaces | map(attribute="private_ip_addresses")
+                      instance_info.instances[0].network_interfaces | map(attribute="private_ip_addresses") | flatten
                   }
                 }
               }
@@ -86,9 +89,15 @@
     - name: Add all inventory contributions
       loop: "{{ hostvars.keys() }}"
       when: hostvars[item].inventory_contribution is defined
-      set_fact:
+      ansible.builtin.set_fact:
         inventory: "{{ inventory | default({}) | combine(hostvars[item].inventory_contribution, recursive=true) }}"
 
     - name: Inventory
-      debug:
+      ansible.builtin.debug:
         var: inventory
+        # If using 'debug' stdout callback plugin, then one could instead use...
+        #
+        #   msg: "{{ inventory | to_yaml(width=1337) }}"
+        #
+        # ... to get a much human-friendlier output.  With default plugin, though,
+        # debug var= is at least readable.
