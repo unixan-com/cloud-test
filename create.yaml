@@ -4,7 +4,7 @@
   gather_facts: false # instances may not exist yet
   vars:
     ec2_defaults:
-      ssh_key: public-ssh-key
+      ssh_key: ansible_ssh_key
       region: us-west-2
       subnet: subnet-074ab24da8eeae0d5
       instance_type: t2.micro
@@ -21,28 +21,42 @@
       connection: local
       block:
 
+        - name: SSH key
+          run_once: true
+          amazon.aws.ec2_key:
+            region: "{{ ec2_or_default.region }}"
+            name: "{{ ec2_or_default.ssh_key }}"
+            key_material: "{{ lookup('file','~/.ssh/id_ed25519.pub') }}"
+            force: false
+          register: ec2_key
+
         - name: EC2 instances
           amazon.aws.ec2_instance:
-            name: "{{ inventory_hostname }}"
-            key_name: "{{ ec2_or_default.ssh_key }}"
             region: "{{ ec2_or_default.region }}"
             vpc_subnet_id: "{{ ec2_or_default.subnet }}"
             instance_type: "{{ ec2_or_default.instance_type }}"
+            name: "{{ inventory_hostname }}"
+            key_name: "{{ ec2_or_default.ssh_key }}"
             security_group: default
             network_interfaces:
               - assign_public_ip: true
             image_id: "{{ ec2_or_default.ami }}"
           register: ec2_instance
 
+    - name: debug
+      debug:
+        var: ec2_instance
+
     - name: Take certain details from EC2 information
       set_fact:
-        ansible_host: ec2_instance.instances[0].public_ip_address
+        ansible_host: "{{ ec2_instance.instances[0].public_ip_address }}"
 
     - name: Ensure host is contactable before continuing
       ansible.builtin.wait_for_connection: {}
 
 - name: Set up web servers
   hosts: web_servers
+  become: true
   tasks:
 
     - name: NGINX installed
@@ -51,6 +65,7 @@
 
 - name: Configure Sales web server
   hosts: sales_web
+  become: true
   tasks:
 
     - name: Index to areas of the site
@@ -85,6 +100,7 @@
 
 - name: Configure Shipping web server
   hosts: shipping_web
+  become: true
   tasks:
 
     - name: Index to areas of the site

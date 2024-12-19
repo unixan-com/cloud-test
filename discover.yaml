@@ -1,5 +1,6 @@
 #!/usr/bin/env ansible-playbook --inventory=dynamic-inventory.yaml
 - name: Dynamically discern and tag EC2 instances
+  hosts: all
   gather_facts: false # instances may not exist yet
   tasks:
 
@@ -10,35 +11,81 @@
       failed_when: false # in case it's not a web server
 
     - name: Check various phrases in index.html
-      when: slurp_index_html is successful
+      when: slurp_index_html.content is defined
       vars:
         index_html: "{{ slurp_index_html.content | b64decode }}"
       block:
 
-        - name: Well known H1 tags on some web servers
+        - name: Well known HTML content on some web servers
+          vars:
+            tier: web
+          loop:
+            - team: sales
+              html_content: <h1>Sales Directory</h1>
+            - team: shipping
+              html_content: <h1>Shipping Directory</h1>
+          when: team is not defined and item.html_content in index_html
           set_fact:
-            sales_web: "{{ sales_web | default(false) or '<h1>Sales Directory</h1>' in index_html }}"
-            shipping_web: "{{ shipping_web | default(false) or '<h1>Shipping Directory</h1>' in index_html }}"
+            team: "{{ item.team }}"
+            tier: "{{ tier }}"
 
-    # more tests could go here, repeating the same pattern of slurp (or other data fetching) and set_fact
-
-    - name: Discern which group
-      loop:
-        - sales_web
-        - shipping_web
-      when: "{{ item }}"  # meta-lookup group's fact
-      set_fact:
-        group: "{{ item }}"
+    # more tests could go here, repeating the same pattern of fetching data and set_fact based on findings
 
     - name: Interact with cloud from localhost
-      delegate_to: localhost
       connection: local
+      become: false
       block:
 
-        - name: Remove the Env tag
+        - name: Get full EC2 instance info
+          amazon.aws.ec2_instance_info:
+            region: "{{ placement.region }}"
+            instance_ids:
+              - "{{ instance_id }}"
+          register: instance_info
+
+        - name: debug
+          debug:
+            var: instance_info
+
+        - name: Set the team tag on the instance
+          when:
+            - team is defined
+            - tier is defined
           amazon.aws.ec2_tag:
-            region: "{{ ec2_or_default.region }}"
-            resource: "{{ ec2.id }}"
+            region: "{{ placement.region }}"
+            resource: "{{ instance_id }}"
             tags:
-              group: "{{ group }}"
+              team: "{{ team }}"
+              tier: "{{ tier }}"
           register: ec2_tag
+
+    - name: Add to inventory for later reporting
+      set_fact:
+        inventory_contribution: >-
+          {{ {
+            (team | default('unknown_team')): {
+              (tier | default('unknown_tier')): {
+                (placement.region | default('unknown_region')): {
+                  (placement.availability_zone | default('unknown_availability_zone')): {
+                    inventory_hostname:
+                      instance_info.instances[0].network_interfaces | map(attribute="private_ip_addresses")
+                  }
+                }
+              }
+            }
+          } }}
+
+- name: Print human-friendly inventory
+  hosts: localhost
+  gather_facts: false
+  tasks:
+
+    - name: Add all inventory contributions
+      loop: "{{ hostvars.keys() }}"
+      when: hostvars[item].inventory_contribution is defined
+      set_fact:
+        inventory: "{{ inventory | default({}) | combine(hostvars[item].inventory_contribution, recursive=true) }}"
+
+    - name: Inventory
+      debug:
+        var: inventory
